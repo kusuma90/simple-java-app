@@ -8,7 +8,7 @@
   "containerDefinitions": [
     {
       "name": "app",
-      "image": "PLACEHOLDER",
+      "image": "amazon/amazon-ecs-sample",
       "essential": true,
       "logConfiguration": {
         "logDriver": "awslogs",
