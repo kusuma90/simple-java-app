@@ -1,1 +1,62 @@
 name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '19'
+          distribution: 'openjdk'
+
+      - name: Build with Gradle
+        run: gradlew clean build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/simple-java-app:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/simple-java-app:$IMAGE_TAG
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition --task-definition simple-task --query taskDefinition > current-task.json
+
+      - name: Update task definition with new image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          jq --arg IMAGE "$ECR_REGISTRY/simple-java-app:$IMAGE_TAG" \
+             '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)' \
+             current-task.json > updated-task.json
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs register-task-definition --cli-input-json file://updated-task.json
+          aws ecs update-service --cluster simple-cluster --service simple-service --force-new-deployment
