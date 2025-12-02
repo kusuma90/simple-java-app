@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'Simple Java App for CI/CD Flow'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(19)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0' // Or your specific JUnit Jupiter version
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0' // Or your specific JUnit Jupiter version
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher' // This is crucial
+}
+tasks.named('test') {
+    useJUnitPlatform()
+}
+application {
+    mainClass = 'com.example.App'
+}
+
+jar {
+    manifest {
+        attributes(
+                'Implementation-Title': 'Simple Java 19 App',
+                'Implementation-Version': version,
+                'Main-Class': 'com.example.App'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
